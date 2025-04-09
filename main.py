@@ -1,13 +1,14 @@
 # main.py
+
 import asyncio
 import logging
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
-from os import getenv
 from dotenv import load_dotenv
+from os import getenv
 
-# Import handler ro'yxatini yig'uvchi modul
+# Barcha handlerlarni ro'yxatdan o'tkazish
 from handlers import register_all_handlers
 
 load_dotenv()
@@ -15,6 +16,7 @@ BOT_TOKEN = getenv("BOT_TOKEN")
 
 async def main():
     logging.basicConfig(level=logging.INFO)
+    
     bot = Bot(token=BOT_TOKEN, parse_mode=ParseMode.HTML)
     dp = Dispatcher(storage=MemoryStorage())
 
