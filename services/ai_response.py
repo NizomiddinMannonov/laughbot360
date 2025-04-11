@@ -1,3 +1,5 @@
+# 📁 services/ai_response.py
+
 import base64
 import io
 import logging
@@ -25,7 +27,6 @@ async def generate_meme_caption(prompt: str, lang: str) -> str:
 
     return response.choices[0].message.content.strip()
 
-
 # 🖼 Mem uchun rasm generatsiyasi (DALL·E orqali)
 async def generate_meme_image(prompt: str, lang: str) -> bytes:
     try:
@@ -42,3 +43,34 @@ async def generate_meme_image(prompt: str, lang: str) -> bytes:
     except Exception as e:
         logging.error(f"❌ Error generating meme image: {e}")
         raise
+
+# 🤖 Remix bosilganda kulgili, kontekstual xabar chiqarish
+async def generate_remix_message(prompt: str, lang: str) -> str:
+    system_prompt = {
+        "uz": (
+            "Siz kulgili, o‘zbekona hazil tuyg‘usiga ega sun’iy intellektsiyasiz. "
+            "Sizdan remix so‘ralganida, foydalanuvchiga qisqa, quvnoq va hazilkash tarzda javob berasiz. "
+            "Javobingiz ichida emoji ishlatsangiz ham bo‘ladi. "
+            "Mavzuni o‘zbek madaniyati, kundalik hayot, yoki zamonaviy mem uslubida tasvirlang."
+        ),
+        "en": (
+            "You are a humorous, meme-savvy AI with a clever personality. "
+            "When a remix is requested, you respond with a short, witty, and fun message. "
+            "You may use emojis. Your reply should feel natural, funny, and fit modern meme culture."
+        ),
+        "ru": (
+            "Ты весёлый и остроумный ИИ, хорошо разбирающийся в мемах. "
+            "Когда пользователь просит ремикс, ты отвечаешь короткой, забавной и креативной фразой. "
+            "Можно использовать эмодзи. Ответ должен быть уместным, современным и вызывать улыбку."
+        )
+    }.get(lang, "You are a funny meme remix assistant. Prompt:")
+
+    response = await client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": system_prompt + "\nPrompt: " + prompt},
+            {"role": "user", "content": "Please reply with a short and funny sentence for remix reaction."}
+        ],
+        temperature=0.9
+    )
+    return response.choices[0].message.content.strip()

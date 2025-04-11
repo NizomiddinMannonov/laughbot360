@@ -12,7 +12,13 @@ texts = {
         "change_lang": "🌐 Change Language",
         "welcome": "🎉 Welcome to Laughbot360!",
         "generating_response": "🤖 Generating response...",
-        "error": "⚠️ An error occurred: {error}"
+        "error": "⚠️ An error occurred: {error}",
+        "daily_limit_exceeded": "🚫 You've reached your daily limit for image generation. Try again tomorrow.",
+        "remaining_attempts": "📌 You can still generate {remaining} more images today.",
+        "content_policy_violation": "⚠️ Your prompt violates our safety system. Please submit a different prompt.",
+        "content_policy_violation_humorous": "Oops! This prompt is a little too wild for OpenAI! Try something else! 😂",
+        "remix_info": "🔁 This is a remix version! You can still generate {remaining} more images today.",
+        
     },
     "uz": {
         "start": "🎉 Xush kelibsiz! Sizga quvnoq, aqlli va kreativ do‘st kerakmi?\nMen — Laughbot360! AI yordamida memlar va ko‘p narsalar shu yerda.\n\nBoshlash uchun quyidagilardan birini tanlang! 👇",
@@ -27,7 +33,13 @@ texts = {
         "change_lang": "🌐 Tilni o‘zgartirish",
         "welcome": "🎉 Xush kelibsiz Laughbot360 botiga!",
         "generating_response": "🤖 Javob yozilmoqda...",
-        "error": "⚠️ Xatolik yuz berdi: {error}"
+        "error": "⚠️ Xatolik yuz berdi: {error}",
+        "daily_limit_exceeded": "🚫 Bugungi rasm generatsiyasi limiti tugadi. Ertaga qayta urinib ko‘ring.",
+        "remaining_attempts": "📌 Bugun yana {remaining} marta rasm yaratishingiz mumkin.",
+        "content_policy_violation": "⚠️ OpenAI xavfsizlik siyosatiga zid matn yuborildi.",
+        "content_policy_violation_humorous": "Hops! Bu matn OpenAI uchun juda qiziquvchan! Boshqa matn yuboring! 😂",
+        "remix_info": "🔁 Bu remix versiyasi! Bugun yana {remaining} marta rasm yaratishingiz mumkin.",
+        
     },
     "ru": {
         "start": "🎉 Добро пожаловать в Laughbot360!\n\nЯ — ваш креативный помощник с искусственным интеллектом. Помогу создать мемы и поднять настроение!\n\nВыберите опцию ниже и начнем веселиться! 👇",
@@ -42,6 +54,12 @@ texts = {
         "change_lang": "🌐 Изменить язык",
         "welcome": "🎉 Добро пожаловать в Laughbot360!",
         "generating_response": "🤖 Ответ генерируется...",
-        "error": "⚠️ Произошла ошибка: {error}"
+        "error": "⚠️ Произошла ошибка: {error}",
+        "daily_limit_exceeded": "🚫 Вы достигли дневного лимита генерации изображений. Попробуйте завтра.",
+        "remaining_attempts": "📌 Сегодня вы можете создать ещё {remaining} изображений.",
+        "content_policy_violation": "⚠️ Запрос отклонён системой безопасности OpenAI.",
+        "content_policy_violation_humorous": "Упс! Этот запрос слишком смелый для OpenAI! Попробуйте что-то другое! 😂",
+        "remix_info": "🔁 Это ремикс! Сегодня вы можете создать ещё {remaining} изображений.",
+        
     }
 }
