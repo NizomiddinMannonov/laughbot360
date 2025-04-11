@@ -1,26 +1,44 @@
-# handlers/language.py
-
-from aiogram import Router, F
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
-from services.database import save_user_language
+from aiogram import Router
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.filters import Text
+from services.database import save_user_language, get_user_language
+from localization.texts import texts
+from keyboards.reply import get_main_keyboard  # ✅ BONUS TAKLIF
 
 router = Router()
 
-@router.message(F.text == "🌐 Tilni o‘zgartirish")
-async def show_language_options(message: Message):
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🇺🇿 O‘zbekcha", callback_data="lang:uz")],
-        [InlineKeyboardButton(text="🇷🇺 Русский", callback_data="lang:ru")],
-        [InlineKeyboardButton(text="🇬🇧 English", callback_data="lang:en")]
-    ])
-    await message.answer("🌐 Iltimos, tilni tanlang:", reply_markup=keyboard)
+# 🌐 Tilni o‘zgartirish menyusi
+@router.message(Text(text=["🌐 Tilni o‘zgartirish", "🌐 Change Language", "🌐 Изменить язык"]))
+async def show_language_menu(message: Message):
+    user_id = message.from_user.id
+    lang = get_user_language(user_id) or "en"
 
-@router.callback_query(F.data.startswith("lang:"))
-async def handle_language_selection(callback: CallbackQuery):
-    lang_code = callback.data.split(":")[1]
-    save_user_language(callback.from_user.id, lang_code)
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🇺🇿 O‘zbek tili")],
+            [KeyboardButton(text="🇷🇺 Русский язык")],
+            [KeyboardButton(text="🇬🇧 English")]
+        ],
+        resize_keyboard=True
+    )
 
-    message_map = {
-        "uz": "🇺🇿 Til muvaffaqiyatli o‘zgartirildi: O‘zbek tili",
-        "ru": "🇷🇺 Язык успешно изменен: Русский",
-        "en": "🇬🇧 Language successfully changed: English"
+    await message.answer(texts[lang]["choose_language"], reply_markup=keyboard)
+
+# 🇺🇿 🇷🇺 🇬🇧 Til tanlanganda qayta menyu chiqarish
+@router.message(Text(text=["🇺🇿 O‘zbek tili", "🇷🇺 Русский язык", "🇬🇧 English"]))
+async def handle_language_selection(message: Message):
+    user_id = message.from_user.id
+    selected_text = message.text
+
+    lang_code = "en"
+    if "O‘zbek" in selected_text:
+        lang_code = "uz"
+    elif "Русский" in selected_text:
+        lang_code = "ru"
+
+    save_user_language(user_id, lang_code)
+
+    await message.answer(
+        texts[lang_code]["lang_selected"],
+        reply_markup=get_main_keyboard(lang_code)  # ✅ BONUS TAKLIF ISHLATILDI
+    )

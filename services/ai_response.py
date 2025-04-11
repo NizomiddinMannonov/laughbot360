@@ -1,23 +1,44 @@
-# services/ai_response.py
+import base64
+import io
+import logging
+from openai import AsyncOpenAI
+from config import OPENAI_API_KEY
 
-import openai
-from os import getenv
-from dotenv import load_dotenv
+client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
-load_dotenv()
-openai.api_key = getenv("OPENAI_API_KEY")
+# 🎨 Mem caption generatsiya funksiyasi
+async def generate_meme_caption(prompt: str, lang: str) -> str:
+    system_prompt = {
+        "en": "You are a meme expert. Return only a short, funny meme caption.",
+        "uz": "Siz mem yaratish bo‘yicha mutaxassissiz. Faqat kulgili va qisqa mem matnini qaytaring.",
+        "ru": "Ты эксперт по мемам. Верни только короткий и смешной текст мема."
+    }.get(lang, "You are a meme expert. Return only a short, funny meme caption.")
 
-async def get_chatgpt_response(message_text: str, system_prompt: str = "You are a helpful assistant"):
+    response = await client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.7
+    )
+
+    return response.choices[0].message.content.strip()
+
+
+# 🖼 Mem uchun rasm generatsiyasi (DALL·E orqali)
+async def generate_meme_image(prompt: str, lang: str) -> bytes:
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",  # yoki "gpt-4" agar sizda mavjud bo‘lsa
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": message_text}
-            ],
-            temperature=0.8,
-            max_tokens=1000
+        response = await client.images.generate(
+            model="dall-e-3",
+            prompt=prompt,
+            size="1024x1024",
+            response_format="b64_json",
+            n=1
         )
-        return response['choices'][0]['message']['content']
+        image_data = response.data[0].b64_json
+        image_bytes = base64.b64decode(image_data)
+        return io.BytesIO(image_bytes)
     except Exception as e:
-        return f"⚠️ Xatolik yuz berdi: {e}"
+        logging.error(f"❌ Error generating meme image: {e}")
+        raise
