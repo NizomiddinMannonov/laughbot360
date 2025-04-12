@@ -61,9 +61,6 @@ async def handle_meme_prompt(message: Message, state: FSMContext):
                 InlineKeyboardButton(text="👍 Like", callback_data="like"),
                 InlineKeyboardButton(text="👎 Dislike", callback_data="dislike"),
                 InlineKeyboardButton(text="🔄 Remix", callback_data=f"remix|{prompt_id}")
-            ],
-            [
-                InlineKeyboardButton(text="📤 Share", switch_inline_query=caption)
             ]
         ])
 
@@ -129,9 +126,6 @@ async def handle_remix(callback: CallbackQuery, bot: Bot):
             InlineKeyboardButton(text="👍 Like", callback_data="like"),
             InlineKeyboardButton(text="👎 Dislike", callback_data="dislike"),
             InlineKeyboardButton(text="🔄 Remix", callback_data=f"remix|{prompt_id}")
-        ],
-        [
-            InlineKeyboardButton(text="📤 Share", switch_inline_query=caption)
         ]
     ])
 
