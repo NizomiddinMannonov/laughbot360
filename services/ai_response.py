@@ -1,33 +1,49 @@
-# 📁 services/ai_response.py
-
 import base64
 import io
 import logging
 from openai import AsyncOpenAI
 from config import OPENAI_API_KEY
 
+# 🎯 OpenAI Client
 client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
-# 🎨 Mem caption generatsiya funksiyasi
+# 🎨 1. Meme caption generatsiya qilish
 async def generate_meme_caption(prompt: str, lang: str) -> str:
-    system_prompt = {
-        "en": "You are a meme expert. Return only a short, funny meme caption.",
-        "uz": "Siz mem yaratish bo‘yicha mutaxassissiz. Faqat kulgili va qisqa mem matnini qaytaring.",
-        "ru": "Ты эксперт по мемам. Верни только короткий и смешной текст мема."
-    }.get(lang, "You are a meme expert. Return only a short, funny meme caption.")
+    system_prompts = {
+        "en": (
+            "You are a professional meme expert. "
+            "Generate a short, witty, and funny meme caption based on the user's input. "
+            "The caption should feel modern, natural, and shareable."
+        ),
+        "uz": (
+            "Siz professional mem mutaxassisisiz. "
+            "Foydalanuvchi yuborgan matn asosida qisqa, kulgili va zamonaviy mem matnini yarating. "
+            "Natija tabiiy va tarqalishga yaroqli bo‘lishi kerak."
+        ),
+        "ru": (
+            "Вы профессиональный эксперт по мемам. "
+            "Создайте короткий, остроумный и смешной текст мема на основе ввода пользователя. "
+            "Результат должен быть современным и легко рассылаемым."
+        )
+    }
+    system_prompt = system_prompts.get(lang, system_prompts["en"])
 
-    response = await client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.7
-    )
+    try:
+        response = await client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7
+        )
+        return response.choices[0].message.content.strip()
 
-    return response.choices[0].message.content.strip()
+    except Exception as e:
+        logging.error(f"❌ Error generating meme caption: {e}")
+        return prompt
 
-# 🖼 Mem uchun rasm generatsiyasi (DALL·E orqali)
+# 🖼 2. DALL·E orqali rasm generatsiya qilish
 async def generate_meme_image(prompt: str, lang: str) -> bytes:
     try:
         response = await client.images.generate(
@@ -40,37 +56,80 @@ async def generate_meme_image(prompt: str, lang: str) -> bytes:
         image_data = response.data[0].b64_json
         image_bytes = base64.b64decode(image_data)
         return io.BytesIO(image_bytes)
+
     except Exception as e:
         logging.error(f"❌ Error generating meme image: {e}")
         raise
 
-# 🤖 Remix bosilganda kulgili, kontekstual xabar chiqarish
+# 🤖 3. Remix uchun kulgili xabar generatsiya qilish
 async def generate_remix_message(prompt: str, lang: str) -> str:
-    system_prompt = {
-        "uz": (
-            "Siz kulgili, o‘zbekona hazil tuyg‘usiga ega sun’iy intellektsiyasiz. "
-            "Sizdan remix so‘ralganida, foydalanuvchiga qisqa, quvnoq va hazilkash tarzda javob berasiz. "
-            "Javobingiz ichida emoji ishlatsangiz ham bo‘ladi. "
-            "Mavzuni o‘zbek madaniyati, kundalik hayot, yoki zamonaviy mem uslubida tasvirlang."
-        ),
+    system_prompts = {
         "en": (
-            "You are a humorous, meme-savvy AI with a clever personality. "
-            "When a remix is requested, you respond with a short, witty, and fun message. "
-            "You may use emojis. Your reply should feel natural, funny, and fit modern meme culture."
+            "You are a humorous, meme-savvy AI assistant. "
+            "When asked for a remix, reply with a short, witty, and funny comment. "
+            "Use emojis if needed. Make it natural, playful, and modern."
+        ),
+        "uz": (
+            "Siz hazilkash va mem madaniyatidan yaxshi xabardor sun'iy intellektsiyasiz. "
+            "Remix so‘ralganda, qisqa va kulgili tarzda javob bering. "
+            "Emoji ishlatishingiz mumkin. Javob zamonaviy va hazil ohangida bo‘lishi kerak."
         ),
         "ru": (
-            "Ты весёлый и остроумный ИИ, хорошо разбирающийся в мемах. "
-            "Когда пользователь просит ремикс, ты отвечаешь короткой, забавной и креативной фразой. "
-            "Можно использовать эмодзи. Ответ должен быть уместным, современным и вызывать улыбку."
+            "Вы весёлый и разбирающийся в мемах ИИ. "
+            "Когда просят ремикс, отвечайте коротко, остроумно и смешно. "
+            "Можно использовать эмодзи. Ответ должен быть современным и игривым."
         )
-    }.get(lang, "You are a funny meme remix assistant. Prompt:")
+    }
+    system_prompt = system_prompts.get(lang, system_prompts["en"])
 
-    response = await client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": system_prompt + "\nPrompt: " + prompt},
-            {"role": "user", "content": "Please reply with a short and funny sentence for remix reaction."}
-        ],
-        temperature=0.9
-    )
-    return response.choices[0].message.content.strip()
+    try:
+        response = await client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Prompt: {prompt}\n\nPlease reply with a funny remix comment."}
+            ],
+            temperature=0.9
+        )
+        return response.choices[0].message.content.strip()
+
+    except Exception as e:
+        logging.error(f"❌ Error generating remix message: {e}")
+        return "🔄 Remix ready! 🎉"
+
+# ✨ 4. Caption + Tasvirdan DALL·E uchun yuqori sifatli prompt yaratish
+async def generate_image_prompt(caption: str, description: str, lang: str = "en") -> str:
+    system_prompts = {
+        "en": (
+            "You are an AI assistant that combines a meme caption and an image description "
+            "to create a high-quality English prompt for DALL·E. "
+            "The prompt must be clear, vivid, and creative."
+        ),
+        "uz": (
+            "Siz mem matni va rasm tasvirini birlashtirib, DALL·E uchun sifatli inglizcha prompt yaratadigan AI yordamchisisiz. "
+            "Prompt aniq, tasavvurga boy va ijodiy bo‘lishi kerak."
+        ),
+        "ru": (
+            "Вы ИИ-ассистент, который объединяет подпись к мему и описание изображения, "
+            "чтобы создать качественный англоязычный запрос для DALL·E. "
+            "Запрос должен быть четким, ярким и креативным."
+        )
+    }
+    system_prompt = system_prompts.get(lang, system_prompts["en"])
+
+    try:
+        user_input = f"Meme Caption: {caption}\nImage Description: {description}"
+
+        response = await client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_input}
+            ],
+            temperature=0.8
+        )
+        return response.choices[0].message.content.strip()
+
+    except Exception as e:
+        logging.error(f"❌ Error generating image prompt: {e}")
+        return f"{caption} with {description}"

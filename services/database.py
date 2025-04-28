@@ -43,6 +43,7 @@ def clear_all_users() -> None:
         users_collection.delete_many({})
         logging.info("✅ Barcha foydalanuvchilar tozalandi.")
 
+
 # 🧠 Prompt saqlash
 
 def save_prompt(prompt: str) -> str:

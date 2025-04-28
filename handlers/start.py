@@ -1,5 +1,3 @@
-# handlers/start.py
-
 from aiogram import Router
 from aiogram.types import Message
 from aiogram.filters import CommandStart
@@ -14,13 +12,13 @@ router = Router()
 async def cmd_start(message: Message):
     user_id = message.from_user.id
 
-    # Yangi foydalanuvchilar uchun default til: inglizcha
+    # 🗣 Tilni olish yoki saqlash (default: en)
     lang = get_user_language(user_id)
     if lang is None:
         lang = "en"
         save_user_language(user_id, lang)
 
-    text = texts[lang]["start"]
-    keyboard = get_main_keyboard(lang)
-
-    await message.answer(text, reply_markup=keyboard)
+    await message.answer(
+        text=texts[lang]["start"],
+        reply_markup=get_main_keyboard(lang)
+    )

@@ -33,9 +33,10 @@ async def create_meme_image(caption: str) -> BufferedInputFile:
 # 🧠 Matnga kulgili uslub berish (stilize caption)
 async def style_caption(prompt: str, lang: str) -> str:
     system_prompt = {
-        "en": "You are a meme stylist. Return the same text but funnier using uppercase, emojis, or funny spelling.",
-        "uz": "Siz mem stilistisiz. Matnni hazil tarzida, emoji yoki katta harflar bilan chiroyli qilib qaytaring.",
-        "ru": "Ты стилист мемов. Верни текст в смешном стиле с эмодзи или капсом."
+        "en": "You are a professional meme stylist.Transform the given text into a funnier, more eye-catching meme caption.Use creative techniques such as: ALL CAPS, emojis, exaggerated spellings, playful tone, and meme slang if needed. Make sure the result feels natural, modern, and highly shareableReturn only the improved meme caption without any explanations.",
+        "uz": "Siz professional mem stilistisiz.Berilgan matnni yanada kulgili, ko‘zni qamashtiradigan mem matniga aylantiring.Kreativ usullar qo‘llang: KATTA HARFLAR, emoji, oshirib yozilgan so‘zlar, o‘ynoqi ohang, kerak bo‘lsa meme slenglaridan foydalaning.Natija zamonaviy, tabiiy va tarqalishga yaroqli bo‘lsin.Faqat yaxshilangan mem matnini qaytaring, hech qanday tushuntirish bermang.",
+        "ru": "Вы профессиональный стилист мемов.Преобразуйте данный текст в более смешной, яркий и запоминающийся текст для мема.Используйте креативные приёмы: ВСЕ ПРОПИСНЫЕ БУКВЫ, эмодзи, преувеличенные написания, игривый тон, а при необходимости — сленг мемов.Результат должен быть современным, естественным и легко рассылаемым.Верните только улучшенный текст мема без объяснений."
+
     }.get(lang, "Make this meme caption funnier and more stylish.")
 
     response = await client.chat.completions.create(
