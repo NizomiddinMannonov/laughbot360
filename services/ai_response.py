@@ -1,51 +1,63 @@
 import base64
 import io
 import logging
+import asyncio
 from openai import AsyncOpenAI
-from config import OPENAI_API_KEY
+from config import settings
 
-# 🎯 OpenAI Client
-client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+logger = logging.getLogger(__name__)
 
-# 🎨 1. Meme caption generatsiya qilish
+class MemeAIError(Exception): pass
+class MemePromptError(MemeAIError): pass
+class MemeCaptionError(MemeAIError): pass
+class MemeImageError(MemeAIError): pass
+
+client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+
+# Helper: universal async retry
+async def async_retry(fn, *args, retries=2, delay=1, timeout=30, **kwargs):
+    for attempt in range(retries + 1):
+        try:
+            return await asyncio.wait_for(fn(*args, **kwargs), timeout=timeout)
+        except Exception as e:
+            logger.warning(f"[AI-RETRY] Attempt {attempt+1} failed: {e}")
+            if attempt == retries:
+                raise
+            await asyncio.sleep(delay)
+
+# Meme caption
 async def generate_meme_caption(prompt: str, lang: str) -> str:
     system_prompts = {
-        "en": (
-            "You are a professional meme expert. "
-            "Generate a short, witty, and funny meme caption based on the user's input. "
-            "The caption should feel modern, natural, and shareable."
-        ),
-        "uz": (
-            "Siz professional mem mutaxassisisiz. "
-            "Foydalanuvchi yuborgan matn asosida qisqa, kulgili va zamonaviy mem matnini yarating. "
-            "Natija tabiiy va tarqalishga yaroqli bo‘lishi kerak."
-        ),
-        "ru": (
-            "Вы профессиональный эксперт по мемам. "
-            "Создайте короткий, остроумный и смешной текст мема на основе ввода пользователя. "
-            "Результат должен быть современным и легко рассылаемым."
-        )
+        # ... system prompt textlari sizda bor ...
+        "en": "...",
+        "uz": "...",
+        "ru": "..."
     }
     system_prompt = system_prompts.get(lang, system_prompts["en"])
-
-    try:
+    async def inner():
         response = await client.chat.completions.create(
             model="gpt-4o",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.7
+            temperature=0.7,
+            max_tokens=64
         )
-        return response.choices[0].message.content.strip()
+        result = response.choices[0].message.content.strip()
+        if not result:
+            raise MemeCaptionError("AI returned empty caption")
+        return result
 
-    except Exception as e:
-        logging.error(f"❌ Error generating meme caption: {e}")
-        return prompt
-
-# 🖼 2. DALL·E orqali rasm generatsiya qilish
-async def generate_meme_image(prompt: str, lang: str) -> bytes:
     try:
+        return await async_retry(inner)
+    except Exception as e:
+        logger.error(f"❌ Error generating meme caption: {e}")
+        raise MemeCaptionError(f"AI caption error: {e}")
+
+# Meme image (DALL·E)
+async def generate_meme_image(prompt: str, lang: str = "en") -> io.BytesIO:
+    async def inner():
         response = await client.images.generate(
             model="dall-e-3",
             prompt=prompt,
@@ -53,83 +65,75 @@ async def generate_meme_image(prompt: str, lang: str) -> bytes:
             response_format="b64_json",
             n=1
         )
+        if not response.data or not response.data[0].b64_json:
+            raise MemeImageError("AI returned empty image")
         image_data = response.data[0].b64_json
         image_bytes = base64.b64decode(image_data)
         return io.BytesIO(image_bytes)
 
+    try:
+        return await async_retry(inner)
     except Exception as e:
-        logging.error(f"❌ Error generating meme image: {e}")
-        raise
+        logger.error(f"❌ Error generating meme image: {e}")
+        raise MemeImageError(f"AI image error: {e}")
 
-# 🤖 3. Remix uchun kulgili xabar generatsiya qilish
+# Meme remix
 async def generate_remix_message(prompt: str, lang: str) -> str:
     system_prompts = {
-        "en": (
-            "You are a humorous, meme-savvy AI assistant. "
-            "When asked for a remix, reply with a short, witty, and funny comment. "
-            "Use emojis if needed. Make it natural, playful, and modern."
-        ),
-        "uz": (
-            "Siz hazilkash va mem madaniyatidan yaxshi xabardor sun'iy intellektsiyasiz. "
-            "Remix so‘ralganda, qisqa va kulgili tarzda javob bering. "
-            "Emoji ishlatishingiz mumkin. Javob zamonaviy va hazil ohangida bo‘lishi kerak."
-        ),
-        "ru": (
-            "Вы весёлый и разбирающийся в мемах ИИ. "
-            "Когда просят ремикс, отвечайте коротко, остроумно и смешно. "
-            "Можно использовать эмодзи. Ответ должен быть современным и игривым."
-        )
+        # ... system prompt textlari sizda bor ...
+        "en": "...",
+        "uz": "...",
+        "ru": "..."
     }
     system_prompt = system_prompts.get(lang, system_prompts["en"])
-
-    try:
+    async def inner():
         response = await client.chat.completions.create(
             model="gpt-4o",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"Prompt: {prompt}\n\nPlease reply with a funny remix comment."}
             ],
-            temperature=0.9
+            temperature=0.9,
+            max_tokens=48
         )
-        return response.choices[0].message.content.strip()
-
-    except Exception as e:
-        logging.error(f"❌ Error generating remix message: {e}")
-        return "🔄 Remix ready! 🎉"
-
-# ✨ 4. Caption + Tasvirdan DALL·E uchun yuqori sifatli prompt yaratish
-async def generate_image_prompt(caption: str, description: str, lang: str = "en") -> str:
-    system_prompts = {
-        "en": (
-            "You are an AI assistant that combines a meme caption and an image description "
-            "to create a high-quality English prompt for DALL·E. "
-            "The prompt must be clear, vivid, and creative."
-        ),
-        "uz": (
-            "Siz mem matni va rasm tasvirini birlashtirib, DALL·E uchun sifatli inglizcha prompt yaratadigan AI yordamchisisiz. "
-            "Prompt aniq, tasavvurga boy va ijodiy bo‘lishi kerak."
-        ),
-        "ru": (
-            "Вы ИИ-ассистент, который объединяет подпись к мему и описание изображения, "
-            "чтобы создать качественный англоязычный запрос для DALL·E. "
-            "Запрос должен быть четким, ярким и креативным."
-        )
-    }
-    system_prompt = system_prompts.get(lang, system_prompts["en"])
+        result = response.choices[0].message.content.strip()
+        if not result:
+            raise MemeCaptionError("AI returned empty remix message")
+        return result
 
     try:
-        user_input = f"Meme Caption: {caption}\nImage Description: {description}"
+        return await async_retry(inner)
+    except Exception as e:
+        logger.error(f"❌ Error generating remix message: {e}")
+        raise MemeCaptionError(f"AI remix error: {e}")
 
+# Caption + image description -> DALL·E prompt
+async def generate_image_prompt(caption: str, description: str, lang: str = "en") -> str:
+    system_prompts = {
+        # ... system prompt textlari sizda bor ...
+        "en": "...",
+        "uz": "...",
+        "ru": "..."
+    }
+    system_prompt = system_prompts.get(lang, system_prompts["en"])
+    async def inner():
+        user_input = f"Meme Caption: {caption}\nImage Description: {description}"
         response = await client.chat.completions.create(
             model="gpt-4o",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_input}
             ],
-            temperature=0.8
+            temperature=0.8,
+            max_tokens=96
         )
-        return response.choices[0].message.content.strip()
+        result = response.choices[0].message.content.strip()
+        if not result:
+            raise MemePromptError("AI returned empty image prompt")
+        return result
 
+    try:
+        return await async_retry(inner)
     except Exception as e:
-        logging.error(f"❌ Error generating image prompt: {e}")
-        return f"{caption} with {description}"
+        logger.error(f"❌ Error generating image prompt: {e}")
+        raise MemePromptError(f"AI prompt error: {e}")

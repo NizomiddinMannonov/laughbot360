@@ -1,44 +1,43 @@
-from aiogram import Router
+from aiogram import Router, F
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
-from aiogram.filters import Text
 from services.database import save_user_language, get_user_language
-from localization.texts import texts
-from keyboards.reply import get_main_keyboard  # ✅ BONUS TAKLIF
+from localization.texts import get_text
+from keyboards.reply import get_main_keyboard
 
 router = Router()
 
-# 🌐 Tilni o‘zgartirish menyusi
-@router.message(Text(text=["🌐 Tilni o‘zgartirish", "🌐 Change Language", "🌐 Изменить язык"]))
-async def show_language_menu(message: Message):
-    user_id = message.from_user.id
-    lang = get_user_language(user_id) or "en"
+# Tillar va matnlari
+languages = {
+    "en": "English 🇬🇧",
+    "uz": "O‘zbek 🇺🇿",
+    "ru": "Русский 🇷🇺"
+}
 
-    keyboard = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="🇺🇿 O‘zbek tili")],
-            [KeyboardButton(text="🇷🇺 Русский язык")],
-            [KeyboardButton(text="🇬🇧 English")]
-        ],
-        resize_keyboard=True
+# --- 1. Settings menyusi va til tanlash
+@router.message(F.text.in_([
+    "/settings",
+    get_text("change_lang", "en"),
+    get_text("change_lang", "uz"),
+    get_text("change_lang", "ru")
+]))
+async def language_menu_handler(message: Message):
+    user_id = message.from_user.id
+    lang = await get_user_language(user_id) or "en"
+    kb = ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=lang_name)] for lang_name in languages.values()],
+        resize_keyboard=True,
+        one_time_keyboard=True
     )
+    await message.answer(get_text("choose_language", lang), reply_markup=kb)
 
-    await message.answer(texts[lang]["choose_language"], reply_markup=keyboard)
-
-# 🇺🇿 🇷🇺 🇬🇧 Til tanlanganda qayta menyu chiqarish
-@router.message(Text(text=["🇺🇿 O‘zbek tili", "🇷🇺 Русский язык", "🇬🇧 English"]))
-async def handle_language_selection(message: Message):
+# --- 2. Til tanlanganda (reply keyboard orqali)
+@router.message(lambda msg: msg.text and msg.text.strip() in languages.values())
+async def language_selected_handler(message: Message):
     user_id = message.from_user.id
-    selected_text = message.text
-
-    lang_code = "en"
-    if "O‘zbek" in selected_text:
-        lang_code = "uz"
-    elif "Русский" in selected_text:
-        lang_code = "ru"
-
-    save_user_language(user_id, lang_code)
-
+    # Qaysi til tanlandi?
+    lang_code = next((k for k, v in languages.items() if v == message.text.strip()), "en")
+    await save_user_language(user_id, lang_code)
     await message.answer(
-        texts[lang_code]["lang_selected"],
-        reply_markup=get_main_keyboard(lang_code)  # ✅ BONUS TAKLIF ISHLATILDI
+        get_text("language_selected", lang_code),
+        reply_markup=get_main_keyboard(lang_code)
     )

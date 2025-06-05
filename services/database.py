@@ -1,88 +1,110 @@
-# 📁 services/database.py
-
 import logging
-from pymongo import MongoClient
-from config import MONGO_URI
-from bson import ObjectId
 from datetime import datetime
+from motor.motor_asyncio import AsyncIOMotorClient
+from config import settings
 
-# 📦 MongoDB ulanish
-try:
-    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
-    db = client["laughbot360"]
-    users_collection = db["users"]
-    prompts_collection = db["prompts"]
-    client.server_info()  # Trigger connection
-    logging.info("✅ MongoDB successfully connected.")
-except Exception as e:
-    logging.error(f"❌ MongoDB bilan ulanishda xatolik: {e}")
-    users_collection = None
-    prompts_collection = None
+logger = logging.getLogger(__name__)
 
-# 🌐 Foydalanuvchining tanlangan tilini olish
-def get_user_language(user_id: int) -> str | None:
-    if users_collection is not None:
-        user = users_collection.find_one({"user_id": user_id})
-        if user and "language" in user:
-            return user["language"]
-    return None
+mongo_client = AsyncIOMotorClient(settings.MONGO_URI)
+db = mongo_client[settings.MONGO_DB_NAME]
 
-# 🌐 Foydalanuvchi tanlagan tilni saqlash
-def save_user_language(user_id: int, language_code: str) -> None:
-    if users_collection is not None:
-        users_collection.update_one(
-            {"user_id": user_id},
-            {"$set": {"language": language_code}},
-            upsert=True
-        )
+users_collection = db['users']
+memes_collection = db['memes']
+likes_collection = db['meme_likes']
 
-# ⚠️ Barcha foydalanuvchilarni tozalash (faqat test vaqtida ishlatish tavsiya qilinadi!)
-def clear_all_users() -> None:
-    if users_collection is not None:
-        logging.warning("🚨 CLEARING ALL USER DATA FROM MONGODB...")
-        users_collection.delete_many({})
-        logging.info("✅ Barcha foydalanuvchilar tozalandi.")
+# --- DATABASE SETUP ---
+async def setup_database() -> None:
+    await users_collection.create_index('telegram_id', unique=True)
+    await memes_collection.create_index('user_id')
+    await likes_collection.create_index([('meme_id', 1), ('user_id', 1)], unique=True)
+    logger.info("Database and indexes are set up.")
 
+async def clear_all_users() -> None:
+    """DEBUG uchun barcha user, mem va statistikani o‘chiradi."""
+    await users_collection.delete_many({})
+    await memes_collection.delete_many({})
+    await likes_collection.delete_many({})
+    logger.info("All users, memes and likes deleted.")
 
-# 🧠 Prompt saqlash
+# --- USER MANAGEMENT ---
+async def add_user(user_id: int, language: str = "en") -> None:
+    await users_collection.update_one(
+        {"telegram_id": user_id},
+        {"$setOnInsert": {"telegram_id": user_id, "language": language}},
+        upsert=True
+    )
 
-def save_prompt(prompt: str) -> str:
-    if prompts_collection is not None:
-        doc = {"prompt": prompt}
-        result = prompts_collection.insert_one(doc)
-        return str(result.inserted_id)
-    return ""
+async def get_user(user_id: int) -> dict | None:
+    return await users_collection.find_one({"telegram_id": user_id})
 
-# 🧠 Promptni ID orqali olish
+async def get_user_language(user_id: int) -> str:
+    user = await get_user(user_id)
+    return user.get("language", "en") if user else "en"
 
-def get_prompt_by_id(prompt_id: str) -> str | None:
-    if prompts_collection is not None:
-        doc = prompts_collection.find_one({"_id": ObjectId(prompt_id)})
-        return doc["prompt"] if doc else None
-    return None
+async def save_user_language(user_id: int, lang_code: str) -> None:
+    await users_collection.update_one(
+        {"telegram_id": user_id},
+        {"$set": {"language": lang_code}},
+        upsert=True
+    )
 
-# ⏳ Foydalanuvchi kunlik limitini tekshirish va yangilash
+# --- LIMIT CHECK ---
+async def check_user_daily_limit(user_id: int, daily_limit: int = 3) -> tuple[bool, int]:
+    start_of_day = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    memes_today = await memes_collection.count_documents({
+        "user_id": user_id,
+        "created_at": {"$gte": start_of_day}
+    })
+    remaining = max(0, daily_limit - memes_today)
+    return (remaining > 0, remaining)
 
-def check_user_daily_limit(db, user_id: int, daily_limit: int = 3) -> tuple[bool, int]:
-    if db is not None:
-        user = db.find_one({"user_id": user_id})
-        today = datetime.utcnow().date()
+# --- PROMPT/MEME ---
+async def save_prompt(prompt: str, user_id: int = None) -> str:
+    doc = {
+        "prompt": prompt,
+        "user_id": user_id,
+        "created_at": datetime.now()
+    }
+    result = await memes_collection.insert_one(doc)
+    return str(result.inserted_id)
 
-        if not user:
-            db.insert_one({"user_id": user_id, "date": today.isoformat(), "count": 1})
-            return True, daily_limit - 1
+async def get_prompt_by_id(prompt_id: str) -> str | None:
+    from bson import ObjectId
+    doc = await memes_collection.find_one({"_id": ObjectId(prompt_id)})
+    return doc.get("prompt") if doc else None
 
-        user_date = datetime.fromisoformat(user.get("date", today.isoformat())).date()
-        count = user.get("count", 0)
+async def save_meme(user_id: int, file_id: str, caption: str, prompt: str = None, created_at=None) -> str:
+    doc = {
+        "user_id": user_id,
+        "file_id": file_id,
+        "caption": caption,
+        "prompt": prompt,
+        "created_at": created_at or datetime.now()
+    }
+    result = await memes_collection.insert_one(doc)
+    return str(result.inserted_id)
 
-        if user_date < today:
-            db.update_one({"user_id": user_id}, {"$set": {"date": today.isoformat(), "count": 1}})
-            return True, daily_limit - 1
+async def get_meme_by_id(meme_id: str) -> dict | None:
+    from bson import ObjectId
+    return await memes_collection.find_one({"_id": ObjectId(meme_id)})
 
-        if count < daily_limit:
-            db.update_one({"user_id": user_id}, {"$inc": {"count": 1}})
-            return True, daily_limit - count - 1
+async def get_user_memes(user_id: int, limit: int = 5):
+    cursor = memes_collection.find({"user_id": user_id, "file_id": {"$exists": True}}).sort("created_at", -1).limit(limit)
+    return await cursor.to_list(length=limit)
 
-        return False, 0
+# --- LIKE / DISLIKE ---
+async def add_meme_vote(meme_id: str, user_id: int, vote: str):
+    await likes_collection.update_one(
+        {"meme_id": meme_id, "user_id": user_id},
+        {"$set": {"vote": vote, "timestamp": datetime.now()}},
+        upsert=True
+    )
 
-    return False, 0
+async def has_voted(meme_id: str, user_id: int):
+    doc = await likes_collection.find_one({"meme_id": meme_id, "user_id": user_id})
+    return doc['vote'] if doc else None
+
+async def get_meme_stats(meme_id: str):
+    like_count = await likes_collection.count_documents({"meme_id": meme_id, "vote": "like"})
+    dislike_count = await likes_collection.count_documents({"meme_id": meme_id, "vote": "dislike"})
+    return like_count, dislike_count

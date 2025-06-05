@@ -1,24 +1,22 @@
 from aiogram import Router
-from aiogram.types import Message
 from aiogram.filters import CommandStart
+from aiogram.types import Message
 
-from services.database import get_user_language, save_user_language
-from localization.texts import texts
+from services.database import get_user_language, add_user
+from localization.texts import get_text
 from keyboards.reply import get_main_keyboard
 
 router = Router()
 
 @router.message(CommandStart())
-async def cmd_start(message: Message):
+async def start_handler(message: Message):
     user_id = message.from_user.id
-
-    # 🗣 Tilni olish yoki saqlash (default: en)
-    lang = get_user_language(user_id)
-    if lang is None:
+    lang = await get_user_language(user_id)
+    if not lang:
         lang = "en"
-        save_user_language(user_id, lang)
+        await add_user(user_id, lang)  # Foydalanuvchini ro‘yxatga olamiz (birinchi kirgan bo‘lsa)
 
     await message.answer(
-        text=texts[lang]["start"],
+        get_text("start", lang),
         reply_markup=get_main_keyboard(lang)
     )
